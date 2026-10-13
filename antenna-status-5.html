@@ -1,0 +1,1095 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Antenna Check Template</title>
+<style>
+/* Layout: top-down plan, antennas two per row inside editable locations (set in settings). Tap a unit to set its status. */
+:root {
+  --bg: #edf0f3;
+  --surface: #ffffff;
+  --ink: #15202b;
+  --muted: #566878;
+  --line: #c6d0da;
+  --accent: #1f5fd1;
+  --ok: #17794a;
+  --warn: #a96a0a;
+  --down: #bf3326;
+  --none: #7d8a97;
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e141a; --surface: #172029; --ink: #e5ecf2; --muted: #92a3b3; --line: #2a3745;
+    --accent: #78aaff; --ok: #3fb97a; --warn: #e3a53b; --down: #ff6f62; --none: #6b7b8a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e141a; --surface: #172029; --ink: #e5ecf2; --muted: #92a3b3; --line: #2a3745;
+  --accent: #78aaff; --ok: #3fb97a; --warn: #e3a53b; --down: #ff6f62; --none: #6b7b8a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.wrap { max-width: 460px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 28px; }
+.wrap.sheet-open { padding-bottom: 440px; }
+
+header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.titles { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.gear { appearance: none; flex: none; width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; cursor: pointer; }
+.gear:hover { border-color: var(--accent); }
+.gear:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.gear svg { width: 22px; height: 22px; display: block; }
+.empty { grid-column: 1 / -1; margin: 0; padding: 24px 0; text-align: center; color: var(--muted); font-size: 12px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1.05; letter-spacing: 0.01em; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 13px; margin: 0; }
+
+.counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.count { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 8px 6px; text-align: center; min-width: 0; }
+.count b { display: block; font-family: var(--font-mono); font-weight: 500; font-size: 20px; font-variant-numeric: tabular-nums; color: var(--c); }
+.count span { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+.plan { position: relative; padding: 14px 0 34px; }
+.helipad-row { display: flex; justify-content: center; margin: 46px 86px 84px 0; }
+.helipad { width: 46px; height: 46px; display: grid; place-items: center; border: 2px solid var(--muted); border-radius: 50%; font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1; color: var(--muted); }
+.hull { position: absolute; left: 0; top: 0; width: calc(100% - 86px); height: 100%; overflow: visible; pointer-events: none; }
+.hull path { fill: var(--surface); stroke: var(--line); stroke-width: 2; stroke-linejoin: round; }
+.zone-block { display: grid; grid-template-columns: minmax(0, 1fr) 80px; column-gap: 6px; align-items: center; }
+.zone-grid { grid-column: 1; width: 100%; max-width: 210px; margin-inline: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.zone-grid .unit { padding: 4px; gap: 4px; }
+.zone-grid .name { font-size: 18px; }
+.zone-grid .name small { font-size: 9.5px; }
+.zone-grid .pill { font-size: 10px; letter-spacing: 0.03em; }
+.grid { position: relative; display: flex; flex-direction: column; }
+.section { grid-column: 2; align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; border-left: 2px solid var(--line); padding-left: 8px; }
+.zone-block + .zone-block { margin-top: 40px; }
+.zone-block.bow + .zone-block { margin-top: 76px; }
+.stern-gap { height: 120px; }
+.section .zone { font-family: var(--font-mono); font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: var(--accent); }
+.section .area { font-family: var(--font-display); font-weight: 600; font-size: 17px; line-height: 1.1; letter-spacing: 0.02em; overflow-wrap: anywhere; }
+
+.unit {
+  --st: var(--none);
+  appearance: none;
+  position: relative;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  min-width: 0;
+  border: 2px solid var(--st);
+  background: color-mix(in srgb, var(--st) 9%, var(--surface));
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+.unit.round { border-radius: 28%; }
+.unit::before { /* dish face */
+  content: "";
+  position: absolute;
+  inset: 14%;
+  border: 1px solid color-mix(in srgb, var(--st) 40%, transparent);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.unit.round::before { border-radius: 22%; }
+.unit:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.unit[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--accent); }
+.s-ok { --st: var(--ok); }
+.s-issue { --st: var(--warn); }
+.s-down { --st: var(--down); }
+.name { position: relative; font-family: var(--font-display); font-weight: 600; font-size: 20px; line-height: 1; letter-spacing: 0.02em; max-width: 100%; overflow-wrap: anywhere; }
+.name small { display: block; font-family: var(--font-mono); font-weight: 400; font-size: 10px; letter-spacing: 0.04em; color: var(--muted); margin-top: 3px; }
+.pill { position: relative; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--st); font-weight: 500; }
+.note-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--st); }
+.unit.round .note-dot { top: 15%; right: 15%; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.btn { appearance: none; font: inherit; font-size: 14px; font-weight: 500; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 9px 14px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.stamp { margin: 10px 0 0; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 24px rgba(0,0,0,0.12);
+  max-height: 78vh;
+  overflow-y: auto;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+}
+.sheet-in { max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.sheet-top { display: flex; align-items: center; gap: 8px; }
+.sheet-top input { flex: 1; min-width: 0; font: inherit; font-family: var(--font-display); font-weight: 600; font-size: 20px; letter-spacing: 0.02em; color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--line); padding: 2px 0; }
+.sheet-top input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.seg button { appearance: none; font: inherit; font-size: 13px; font-weight: 500; padding: 9px 4px; border-radius: 6px; border: 2px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; min-width: 0; }
+.seg button[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 16%, var(--surface)); color: var(--c); font-weight: 600; }
+.seg button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.sheet textarea { font: inherit; font-size: 14px; width: 100%; min-height: 56px; resize: vertical; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: var(--bg); color: var(--ink); }
+.sheet textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.close { appearance: none; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 6px; font: inherit; font-size: 13px; padding: 6px 10px; cursor: pointer; }
+.meta { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin: 0; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); top: calc(14px + env(safe-area-inset-top, 0px)); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 20; }
+[hidden] { display: none !important; }
+
+.photo-badge { position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 3px; font-family: var(--font-mono); font-size: 11px; color: var(--st); }
+.unit.round .photo-badge { top: 12%; left: 12%; }
+.photo-badge svg { width: 13px; height: 13px; display: block; }
+
+.photos { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+.thumb { appearance: none; width: 56px; height: 56px; padding: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--bg); cursor: pointer; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn.add { padding: 7px 12px; font-size: 13px; }
+
+.lightbox { position: fixed; inset: 0; z-index: 10; background: #05090d; color: #e5ecf2; display: flex; flex-direction: column; }
+.lb-bar, .lb-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; font-family: var(--font-mono); font-size: 12px; }
+.lb-bar { padding-top: calc(10px + env(safe-area-inset-top, 0px)); }
+.lb-nav { padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+.lb-actions { display: flex; gap: 8px; }
+.lb-bar button, .lb-nav button { font: inherit; font-size: 13px; color: #e5ecf2; background: #1b2630; border: 1px solid #33424f; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+.lb-bar button:focus-visible, .lb-nav button:focus-visible { outline: 3px solid #78aaff; outline-offset: 2px; }
+.lb-hint { color: #92a3b3; }
+.lb-stage { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; justify-content: center; }
+.lb-stage img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; cursor: zoom-in; }
+.lb-stage.zoomed { display: block; }
+.lb-stage.zoomed img { max-width: none; max-height: none; width: 250%; height: auto; cursor: zoom-out; }
+
+.settings { position: fixed; inset: 0; z-index: 12; background: var(--bg); color: var(--ink); display: flex; flex-direction: column; }
+.st-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; padding-top: calc(12px + env(safe-area-inset-top, 0px)); border-bottom: 1px solid var(--line); background: var(--surface); }
+.st-bar h2 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: 0.01em; }
+.st-body { flex: 1; min-height: 0; overflow-y: auto; width: 100%; max-width: 460px; margin: 0 auto; padding: 14px 16px calc(28px + env(safe-area-inset-bottom, 0px)); }
+.st-help { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+.st-sec { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 12px; margin-bottom: 14px; }
+.st-sec-head, .st-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.st-input { font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; min-width: 0; height: 34px; }
+.st-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.st-input.zone { width: 76px; font-family: var(--font-mono); letter-spacing: 0.06em; }
+.st-input.area { flex: 1 1 120px; font-family: var(--font-display); font-weight: 600; font-size: 17px; }
+.st-row .st-input.name { flex: 1 1 90px; }
+.mini { appearance: none; font: inherit; font-size: 14px; min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); cursor: pointer; }
+.mini:disabled { opacity: 0.35; cursor: default; }
+.mini:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.mini.armed { border-color: var(--down); color: var(--down); font-weight: 600; }
+.st-note { margin: 0; font-size: 12px; color: var(--muted); }
+.st-add { display: flex; align-items: center; gap: 6px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.st-add .st-input { flex: 1; }
+
+#report { display: none; }
+@media print {
+  @page { size: A4; margin: 14mm; }
+  html, body { background: #fff !important; color: #14202b !important; }
+  .wrap, .sheet, .toast, .lightbox, .settings { display: none !important; }
+  #report { display: block; font-family: var(--font-body); font-size: 10.5pt; line-height: 1.4; color: #14202b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #report h1 { font-family: var(--font-display); font-weight: 700; font-size: 26pt; line-height: 1.05; margin: 0; letter-spacing: 0.01em; }
+  #report h2 { font-family: var(--font-display); font-weight: 700; font-size: 20pt; margin: 0 0 8pt; }
+  .r-head { border-bottom: 2pt solid #14202b; padding-bottom: 6pt; margin-bottom: 10pt; }
+  .r-date { margin: 4pt 0 0; font-size: 10pt; color: #566878; }
+  .r-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6pt; margin-bottom: 12pt; }
+  .r-count { border: 0.75pt solid #c6d0da; border-radius: 4pt; padding: 6pt; text-align: center; }
+  .r-count b { display: block; font-family: var(--font-mono); font-weight: 500; font-size: 18pt; }
+  .r-count span { font-size: 8pt; letter-spacing: 0.06em; text-transform: uppercase; color: #566878; }
+  .r-plan { display: grid; grid-template-columns: repeat(2, 42mm); gap: 6pt 10pt; justify-content: start; margin-bottom: 14pt; break-inside: avoid; }
+  .r-sec { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8pt; border-bottom: 0.75pt solid #c6d0da; padding-bottom: 3pt; }
+  .r-sec:not(:first-child) { margin-top: 8pt; }
+  .r-zone { font-family: var(--font-mono); font-weight: 500; font-size: 9pt; letter-spacing: 0.14em; color: #1f5fd1; }
+  .r-area { font-family: var(--font-display); font-weight: 600; font-size: 13pt; }
+  .r-tile { border: 1.5pt solid #6b7885; border-radius: 3pt; height: 13mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.05em; }
+  .r-tile.round { border-radius: 9pt; }
+  .r-tile b { font-family: var(--font-display); font-weight: 600; font-size: 12pt; letter-spacing: 0.02em; text-transform: none; color: #14202b; }
+  .r-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  .r-table th { text-align: left; border-bottom: 1.5pt solid #14202b; padding: 4pt 5pt; font-size: 8pt; letter-spacing: 0.06em; text-transform: uppercase; color: #566878; }
+  .r-table td { border-bottom: 0.5pt solid #c6d0da; padding: 4pt 5pt; vertical-align: top; }
+  .r-table tr { break-inside: avoid; }
+  .r-strong { font-weight: 600; }
+  .r-note { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .r-photos { break-before: page; }
+  .r-block { margin-bottom: 14pt; }
+  .r-block h3 { font-family: var(--font-display); font-weight: 600; font-size: 13pt; margin: 0; break-after: avoid; }
+  .r-meta { margin: 2pt 0 6pt; font-size: 9.5pt; color: #566878; white-space: pre-wrap; overflow-wrap: anywhere; break-after: avoid; }
+  .r-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8pt; }
+  .r-grid figure { margin: 0; break-inside: avoid; }
+  .r-grid img { display: block; width: 100%; max-height: 95mm; object-fit: contain; background: #f1f4f7; border: 0.5pt solid #c6d0da; }
+  .r-grid figcaption { margin-top: 2pt; font-family: var(--font-mono); font-size: 8pt; color: #566878; }
+}
+
+@media (prefers-reduced-motion: no-preference) { .unit { transition: background 0.15s, border-color 0.15s; } }
+</style>
+
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <header>
+    <div class="titles">
+      <h1>Antenna Check Template</h1>
+      <p class="sub">Top view, bow at the top. Tap an antenna to set its status and add a note.</p>
+    </div>
+    <button class="gear" id="gearBtn" type="button" aria-label="Layout settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+
+  <div class="counts" id="counts"></div>
+
+  <div class="plan" id="plan">
+    <svg class="hull" id="hull" aria-hidden="true"><path id="hullPath" d=""/></svg>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="pdf" type="button">Generate PDF report</button>
+    <button class="btn" id="reset" type="button">Reset all</button>
+  </div>
+  <p class="stamp" id="stamp"></p>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-in">
+    <div class="sheet-top">
+      <input id="nameInput" type="text" maxlength="24" aria-label="Antenna name">
+      <button class="close" id="closeBtn" type="button">Done</button>
+    </div>
+    <div class="seg" id="seg"></div>
+    <textarea id="noteInput" placeholder="Note (e.g. no lock, high obstruction, cable damage)" aria-label="Note"></textarea>
+    <div class="photos">
+      <div class="thumbs" id="thumbs"></div>
+      <button class="btn add" id="addPhoto" type="button">Add photo</button>
+      <input id="photoInput" type="file" accept="image/*" multiple hidden>
+    </div>
+    <p class="meta" id="photoHint" hidden>This browser can't store photos, so they will be lost when you close the page.</p>
+    <p class="meta" id="meta"></p>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<div class="settings" id="settings" hidden>
+  <div class="st-bar">
+    <h2>Layout settings</h2>
+    <button class="close" id="settingsClose" type="button">Done</button>
+  </div>
+  <div class="st-body" id="stBody"></div>
+</div>
+
+<div id="report" aria-hidden="true"></div>
+
+<div class="lightbox" id="lightbox" hidden>
+  <div class="lb-bar">
+    <span id="lbCount"></span>
+    <span class="lb-actions">
+      <button type="button" id="lbDelete">Delete</button>
+      <button type="button" id="lbClose">Close</button>
+    </span>
+  </div>
+  <div class="lb-stage" id="lbStage"><img id="lbImg" alt="Antenna photo"></div>
+  <div class="lb-nav">
+    <button type="button" id="lbPrev">Previous</button>
+    <span class="lb-hint">Tap photo to zoom</span>
+    <button type="button" id="lbNext">Next</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var KEY = 'antenna-check-template-v2';
+  var STATUSES = [
+    { id: 'none', label: 'Unchecked', cls: '', color: 'var(--none)' },
+    { id: 'ok', label: 'OK', cls: 's-ok', color: 'var(--ok)' },
+    { id: 'issue', label: 'Issue', cls: 's-issue', color: 'var(--warn)' },
+    { id: 'down', label: 'Down', cls: 's-down', color: 'var(--down)' }
+  ];
+  var LAYOUT_KEY = 'antenna-check-layout-v2';
+  var TYPES = [
+    { name: 'Starlink', prefix: 'SL', round: false },
+    { name: 'Kymeta OneWeb', prefix: 'KY', round: true },
+    { name: 'Other', prefix: 'ANT', round: false }
+  ];
+  function typeInfo(name) { return TYPES.filter(function (t) { return t.name === name; })[0] || TYPES[2]; }
+
+  // Default layout, bow at the top: locations run FWD, MID, AFT. Antennas read row by row, two per row.
+  function defaultLayout() {
+    return [
+      { zone: 'FWD', area: 'Solarium', items: [
+        { id: 'kym2', label: 'KY-2', type: 'Kymeta OneWeb' },
+        { id: 'sl8', label: 'SL-8', type: 'Starlink' }
+      ] },
+      { zone: 'MID', area: 'Lawn Club', items: [
+        { id: 'kym1', label: 'KY-1', type: 'Kymeta OneWeb' },
+        { id: 'sl7', label: 'SL-7', type: 'Starlink' },
+        { id: 'sl5', label: 'SL-5', type: 'Starlink' },
+        { id: 'sl6', label: 'SL-6', type: 'Starlink' },
+        { id: 'sl3', label: 'SL-3', type: 'Starlink' },
+        { id: 'sl4', label: 'SL-4', type: 'Starlink' },
+        { id: 'sl1', label: 'SL-1', type: 'Starlink' },
+        { id: 'sl2', label: 'SL-2', type: 'Starlink' }
+      ] },
+      { zone: 'AFT', area: 'Stern', items: [] }
+    ];
+  }
+  var layout = defaultLayout();
+  var DEFAULTS = []; // flat list of every antenna, rebuilt from layout
+
+  function loadLayout() {
+    try {
+      var raw = localStorage.getItem(LAYOUT_KEY);
+      if (raw) {
+        var l = JSON.parse(raw);
+        if (Array.isArray(l)) {
+          layout = l.map(function (s) {
+            return {
+              zone: String(s.zone || ''),
+              area: String(s.area || ''),
+              items: (Array.isArray(s.items) ? s.items : []).map(function (it) {
+                return { id: String(it.id), label: String(it.label || ''), type: typeInfo(it.type).name };
+              })
+            };
+          });
+        }
+      }
+    } catch (e) {}
+  }
+  function saveLayout() { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch (e) {} }
+  function rebuild() {
+    DEFAULTS = [];
+    layout.forEach(function (sec, si) {
+      sec.items.forEach(function (it, k) {
+        DEFAULTS.push({ id: it.id, label: it.label, type: it.type, round: typeInfo(it.type).round, zone: sec.zone, area: sec.area, first: k === 0, si: si });
+      });
+    });
+  }
+  function byId(id) { return DEFAULTS.filter(function (d) { return d.id === id; })[0]; }
+
+  var state = {};
+  var selected = null;
+
+  function blank() {
+    var s = {};
+    DEFAULTS.forEach(function (d) { s[d.id] = { status: 'none', note: '', label: d.label, ts: null }; });
+    return s;
+  }
+  function load() {
+    state = blank();
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) {
+        var saved = JSON.parse(raw);
+        DEFAULTS.forEach(function (d) { if (saved[d.id]) state[d.id] = Object.assign(state[d.id], saved[d.id]); });
+      }
+    } catch (e) {}
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  function statusOf(id) { return STATUSES.filter(function (s) { return s.id === state[id].status; })[0] || STATUSES[0]; }
+  function fmt(ts) { return ts ? new Date(ts).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''; }
+
+  var grid = document.getElementById('grid');
+  var countsEl = document.getElementById('counts');
+
+  function renderCounts() {
+    countsEl.innerHTML = '';
+    STATUSES.forEach(function (s) {
+      var n = DEFAULTS.filter(function (d) { return state[d.id].status === s.id; }).length;
+      var box = document.createElement('div');
+      box.className = 'count';
+      box.style.setProperty('--c', s.color);
+      var b = document.createElement('b'); b.textContent = n;
+      var sp = document.createElement('span'); sp.textContent = s.label;
+      box.appendChild(b); box.appendChild(sp);
+      countsEl.appendChild(box);
+    });
+  }
+
+  var hullEl = document.getElementById('hull');
+  var hullPath = document.getElementById('hullPath');
+
+  // Returns the grid that holds this location's antennas. The first location sits in the bow and is narrower.
+  function addSection(zone, area) {
+    var block = document.createElement('div');
+    block.className = 'zone-block';
+    var zg = document.createElement('div');
+    zg.className = 'zone-grid';
+    var sec = document.createElement('div');
+    sec.className = 'section';
+    var z = document.createElement('span'); z.className = 'zone'; z.textContent = zone;
+    var a = document.createElement('span'); a.className = 'area'; a.textContent = area;
+    sec.appendChild(z); sec.appendChild(a);
+    block.appendChild(zg);
+    block.appendChild(sec);
+    grid.appendChild(block);
+    return zg;
+  }
+
+  // Draws the hull outline around the plan: pointed bow at the top around the first location, flat stern at the bottom.
+  function drawHull() {
+    var hs = hullEl.getBoundingClientRect();
+    var W = hs.width, H = hs.height;
+    if (!W || !H) return;
+    var cx = W / 2, m = 3, hw = W / 2 - m;
+    var yTop = 190, yFull = 312, hwT = Math.min(hw - 6, 105);
+    var fg = grid.querySelector('.zone-grid');
+    var ft = grid.querySelector('.unit');
+    if (fg && ft) {
+      var gr = fg.getBoundingClientRect(), tr = ft.getBoundingClientRect();
+      yTop = tr.top - hs.top;
+      yFull = tr.bottom - hs.top + 22;
+      hwT = Math.min(hw - 6, gr.width / 2);
+    }
+    yFull = Math.min(Math.max(yFull, yTop + 40), H - 30);
+    // Pointed bow: half-width w(y) = hw * (1 - (1 - y / yFull)^p), full width at yFull.
+    // p is chosen so the hull clears the first row of antennas by 14px.
+    var need = Math.min(hw - 1, hwT + 14) / hw;
+    var p = Math.log(1 - need) / Math.log(1 - Math.min(yTop / yFull, 0.97));
+    p = Math.max(1.3, Math.min(3, p));
+    var right = [], left = [], n = 36, i;
+    for (i = 0; i <= n; i++) {
+      var u = i / n;
+      var y = m + (yFull - m) * u;
+      var w = hw * (1 - Math.pow(1 - u, p));
+      right.push((cx + w).toFixed(1) + ' ' + y.toFixed(1));
+      left.unshift((cx - w).toFixed(1) + ' ' + y.toFixed(1));
+    }
+    var d = 'M ' + right.join(' L ') + ' L ' + (W - m) + ' ' + (H - m) + ' L ' + m + ' ' + (H - m) + ' L ' + left.join(' L ') + ' Z';
+    hullPath.setAttribute('d', d);
+  }
+  window.addEventListener('resize', drawHull);
+  if (document.fonts && document.fonts.ready) { document.fonts.ready.then(drawHull); }
+
+  function renderGrid() {
+    grid.innerHTML = '';
+    var hp = document.createElement('div');
+    hp.className = 'helipad-row';
+    var hc = document.createElement('div');
+    hc.className = 'helipad';
+    hc.textContent = 'H';
+    hc.setAttribute('role', 'img');
+    hc.setAttribute('aria-label', 'Helipad, at the bow');
+    hp.appendChild(hc);
+    grid.appendChild(hp);
+    var shown = 0;
+    layout.forEach(function (sec) {
+      if (!sec.items.length) return; // locations without antennas stay off the map
+      var zg = addSection(sec.zone, sec.area);
+      if (!shown) zg.parentNode.className += ' bow'; // first location on the map, in the bow
+      sec.items.forEach(function (it) {
+        var d = byId(it.id);
+        if (d) { zg.appendChild(makeTile(d)); shown++; }
+      });
+    });
+    // Keep open deck space at the stern when the last location (for example AFT) exists but has no antennas yet.
+    var lastSec = layout[layout.length - 1];
+    if (shown && lastSec && !lastSec.items.length) {
+      var stern = document.createElement('div');
+      stern.className = 'stern-gap';
+      grid.appendChild(stern);
+    }
+    if (!shown) {
+      var nosec = document.createElement('p');
+      nosec.className = 'empty';
+      nosec.textContent = 'No antennas on the ship yet. Open settings to add some.';
+      grid.appendChild(nosec);
+    }
+    renderCounts();
+    drawHull();
+  }
+
+  function makeTile(d) {
+      var st = statusOf(d.id);
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'unit ' + st.cls + (d.round ? ' round' : '');
+      btn.setAttribute('aria-pressed', selected === d.id ? 'true' : 'false');
+      btn.setAttribute('aria-label', state[d.id].label + ', ' + d.type + ', ' + st.label);
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = state[d.id].label;
+      var small = document.createElement('small');
+      small.textContent = d.type;
+      name.appendChild(small);
+      var pill = document.createElement('span');
+      pill.className = 'pill';
+      pill.textContent = st.label;
+      btn.appendChild(name);
+      btn.appendChild(pill);
+      if (state[d.id].note) { var dot = document.createElement('span'); dot.className = 'note-dot'; btn.appendChild(dot); }
+      var pc = (photos[d.id] || []).length;
+      if (pc) {
+        var badge = document.createElement('span');
+        badge.className = 'photo-badge';
+        badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+        var cnt = document.createElement('span');
+        cnt.textContent = pc;
+        badge.appendChild(cnt);
+        btn.appendChild(badge);
+      }
+      btn.addEventListener('click', function () { select(d.id); });
+      return btn;
+  }
+
+  var sheet = document.getElementById('sheet');
+  var wrap = document.getElementById('wrap');
+  var seg = document.getElementById('seg');
+  var nameInput = document.getElementById('nameInput');
+  var noteInput = document.getElementById('noteInput');
+  var meta = document.getElementById('meta');
+
+  function renderSeg() {
+    seg.innerHTML = '';
+    STATUSES.forEach(function (s) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = s.label;
+      b.style.setProperty('--c', s.color);
+      b.setAttribute('aria-pressed', state[selected].status === s.id ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        state[selected].status = s.id;
+        state[selected].ts = Date.now();
+        save(); renderSeg(); renderGrid(); renderMeta(); renderStamp();
+      });
+      seg.appendChild(b);
+    });
+  }
+  function renderMeta() {
+    var d = DEFAULTS.filter(function (x) { return x.id === selected; })[0];
+    var t = state[selected].ts;
+    meta.textContent = d.type + (t ? ' · updated ' + fmt(t) : ' · not checked yet');
+  }
+  function select(id) {
+    selected = id;
+    nameInput.value = state[id].label;
+    noteInput.value = state[id].note;
+    sheet.hidden = false;
+    wrap.classList.add('sheet-open');
+    renderSeg(); renderMeta(); renderGrid(); renderThumbs();
+  }
+  function closeSheet() {
+    selected = null;
+    sheet.hidden = true;
+    wrap.classList.remove('sheet-open');
+    renderGrid();
+  }
+
+  nameInput.addEventListener('input', function () {
+    if (!selected) return;
+    var typed = nameInput.value.trim();
+    if (typed) {
+      state[selected].label = typed;
+      layout.forEach(function (sec) { sec.items.forEach(function (it) { if (it.id === selected) it.label = typed; }); });
+      saveLayout(); rebuild();
+    }
+    save(); renderGrid();
+  });
+  noteInput.addEventListener('input', function () {
+    if (!selected) return;
+    state[selected].note = noteInput.value;
+    state[selected].ts = Date.now();
+    save(); renderGrid(); renderMeta(); renderStamp();
+  });
+  document.getElementById('closeBtn').addEventListener('click', closeSheet);
+
+  // ---- Photos: compressed to JPEG and kept in IndexedDB, one list per antenna ----
+  var photos = {};
+  var db = null;
+  var lbId = null, lbIndex = 0, delArmed = false, delTimer;
+
+  function openDB(done) {
+    try {
+      var req = indexedDB.open('antenna-check-photos', 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore('photos'); };
+      req.onsuccess = function () { db = req.result; done(); };
+      req.onerror = function () { done(); };
+    } catch (e) { done(); }
+  }
+  function loadPhotos(done) {
+    if (!db) { done(); return; }
+    try {
+      var cur = db.transaction('photos', 'readonly').objectStore('photos').openCursor();
+      cur.onsuccess = function () {
+        var c = cur.result;
+        if (c) { photos[c.key] = c.value; c.continue(); } else { done(); }
+      };
+      cur.onerror = function () { done(); };
+    } catch (e) { done(); }
+  }
+  function savePhotos(id) {
+    if (!db) return;
+    try { db.transaction('photos', 'readwrite').objectStore('photos').put(photos[id] || [], id); } catch (e) {}
+  }
+  function deletePhotoRecord(id) {
+    if (!db) return;
+    try { db.transaction('photos', 'readwrite').objectStore('photos').delete(id); } catch (e) {}
+  }
+  function clearAllPhotos() {
+    photos = {};
+    if (!db) return;
+    try { db.transaction('photos', 'readwrite').objectStore('photos').clear(); } catch (e) {}
+  }
+
+  function compress(file, done) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      var max = 1600, w = img.naturalWidth, h = img.naturalHeight;
+      var k = Math.min(1, max / Math.max(w, h));
+      var c = document.createElement('canvas');
+      c.width = Math.round(w * k); c.height = Math.round(h * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      done(c.toDataURL('image/jpeg', 0.78));
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); done(null); };
+    img.src = url;
+  }
+
+  var thumbsEl = document.getElementById('thumbs');
+  var photoInput = document.getElementById('photoInput');
+
+  function renderThumbs() {
+    thumbsEl.innerHTML = '';
+    if (!selected) return;
+    (photos[selected] || []).forEach(function (src, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'thumb';
+      b.setAttribute('aria-label', 'Open photo ' + (i + 1));
+      var im = document.createElement('img');
+      im.src = src; im.alt = '';
+      b.appendChild(im);
+      b.addEventListener('click', function () { openLightbox(selected, i); });
+      thumbsEl.appendChild(b);
+    });
+  }
+
+  document.getElementById('addPhoto').addEventListener('click', function () { photoInput.click(); });
+  photoInput.addEventListener('change', function () {
+    var id = selected;
+    var files = Array.prototype.slice.call(photoInput.files || []);
+    photoInput.value = '';
+    if (!id || !files.length) return;
+    var i = 0;
+    (function next() {
+      if (i >= files.length) return;
+      compress(files[i++], function (data) {
+        if (data) {
+          photos[id] = (photos[id] || []).concat([data]);
+          state[id].ts = Date.now();
+          savePhotos(id); save();
+          if (selected === id) { renderThumbs(); renderMeta(); }
+          renderGrid(); renderStamp();
+        } else {
+          showToast('Could not read that photo');
+        }
+        next();
+      });
+    })();
+  });
+
+  var lb = document.getElementById('lightbox');
+  var lbStage = document.getElementById('lbStage');
+  var lbImg = document.getElementById('lbImg');
+  var lbCount = document.getElementById('lbCount');
+  var lbDelete = document.getElementById('lbDelete');
+
+  function lbRender() {
+    var list = photos[lbId] || [];
+    if (!list.length) { closeLightbox(); return; }
+    if (lbIndex >= list.length) lbIndex = list.length - 1;
+    lbImg.src = list[lbIndex];
+    lbStage.classList.remove('zoomed');
+    lbStage.scrollLeft = 0; lbStage.scrollTop = 0;
+    lbCount.textContent = state[lbId].label + ' · ' + (lbIndex + 1) + ' / ' + list.length;
+    document.getElementById('lbPrev').hidden = list.length < 2;
+    document.getElementById('lbNext').hidden = list.length < 2;
+    delArmed = false;
+    lbDelete.textContent = 'Delete';
+  }
+  function openLightbox(id, i) { lbId = id; lbIndex = i; lb.hidden = false; lbRender(); }
+  function closeLightbox() { lb.hidden = true; lbId = null; lbImg.removeAttribute('src'); }
+  function lbStep(d) {
+    var n = (photos[lbId] || []).length;
+    if (n < 2) return;
+    lbIndex = (lbIndex + d + n) % n;
+    lbRender();
+  }
+
+  lbImg.addEventListener('click', function (e) {
+    var r = lbImg.getBoundingClientRect();
+    var fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+    var zoomed = lbStage.classList.toggle('zoomed');
+    if (zoomed) {
+      lbStage.scrollLeft = fx * lbImg.offsetWidth - lbStage.clientWidth / 2;
+      lbStage.scrollTop = fy * lbImg.offsetHeight - lbStage.clientHeight / 2;
+    } else {
+      lbStage.scrollLeft = 0; lbStage.scrollTop = 0;
+    }
+  });
+  document.getElementById('lbPrev').addEventListener('click', function () { lbStep(-1); });
+  document.getElementById('lbNext').addEventListener('click', function () { lbStep(1); });
+  document.getElementById('lbClose').addEventListener('click', closeLightbox);
+  lbDelete.addEventListener('click', function () {
+    if (!delArmed) {
+      delArmed = true;
+      lbDelete.textContent = 'Tap again to delete';
+      clearTimeout(delTimer);
+      delTimer = setTimeout(function () { delArmed = false; lbDelete.textContent = 'Delete'; }, 3000);
+      return;
+    }
+    clearTimeout(delTimer);
+    var id = lbId;
+    photos[id].splice(lbIndex, 1);
+    savePhotos(id);
+    state[id].ts = Date.now();
+    save();
+    if (selected === id) { renderThumbs(); renderMeta(); }
+    renderGrid(); renderStamp();
+    lbRender();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (lb.hidden) return;
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') lbStep(-1);
+    if (e.key === 'ArrowRight') lbStep(1);
+  });
+
+  var toast = document.getElementById('toast');
+  var toastTimer;
+  function showToast(msg) {
+    toast.textContent = msg; toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.hidden = true; }, 1800);
+  }
+
+  // ---- Settings: edit locations (tags and names) and add, remove or reorder antennas ----
+  var settingsEl = document.getElementById('settings');
+  var stBody = document.getElementById('stBody');
+
+  function layoutChanged() { saveLayout(); rebuild(); renderGrid(); }
+
+  function purgeAntenna(id) {
+    delete state[id];
+    delete photos[id];
+    deletePhotoRecord(id);
+    if (selected === id) closeSheet();
+  }
+  function nextNumber(prefix) {
+    var max = 0;
+    var re = new RegExp('^' + prefix + '-(\\d+)$');
+    DEFAULTS.forEach(function (d) {
+      var lab = state[d.id] ? state[d.id].label : d.label;
+      var m = re.exec(lab);
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    });
+    return max + 1;
+  }
+  function addAntenna(sec, typeName) {
+    var info = typeInfo(typeName);
+    var label = info.prefix + '-' + nextNumber(info.prefix);
+    var id = 'a' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
+    sec.items.push({ id: id, label: label, type: info.name });
+    state[id] = { status: 'none', note: '', label: label, ts: null };
+    save(); layoutChanged(); renderStamp(); renderSettings();
+  }
+  function removeAntenna(sec, k) {
+    var it = sec.items[k];
+    sec.items.splice(k, 1);
+    purgeAntenna(it.id);
+    save(); layoutChanged(); renderStamp(); renderSettings();
+  }
+  function moveItem(sec, k, dir) {
+    var j = k + dir;
+    var t = sec.items[k]; sec.items[k] = sec.items[j]; sec.items[j] = t;
+    layoutChanged(); renderSettings();
+  }
+  function moveSection(si, dir) {
+    var j = si + dir;
+    var t = layout[si]; layout[si] = layout[j]; layout[j] = t;
+    layoutChanged(); renderSettings();
+  }
+  function removeSection(si) {
+    layout[si].items.forEach(function (it) { purgeAntenna(it.id); });
+    layout.splice(si, 1);
+    save(); layoutChanged(); renderStamp(); renderSettings();
+  }
+
+  // Two-tap confirm, since the page cannot show confirmation dialogs.
+  function armable(btn, idle, armedText, action) {
+    var armed = false, t;
+    btn.addEventListener('click', function () {
+      if (!armed) {
+        armed = true;
+        btn.textContent = armedText;
+        btn.classList.add('armed');
+        clearTimeout(t);
+        t = setTimeout(function () { armed = false; btn.textContent = idle; btn.classList.remove('armed'); }, 3000);
+        return;
+      }
+      clearTimeout(t);
+      action();
+    });
+  }
+  function mini(text, label, onClick, disabled) {
+    var b = el('button', 'mini', text);
+    b.type = 'button';
+    b.setAttribute('aria-label', label);
+    if (disabled) b.disabled = true;
+    if (onClick) b.addEventListener('click', onClick);
+    return b;
+  }
+  function typeSelect(value, onChange) {
+    var s = el('select', 'st-input');
+    s.setAttribute('aria-label', 'Antenna type');
+    TYPES.forEach(function (t) {
+      var o = el('option', '', t.name);
+      o.value = t.name;
+      if (t.name === value) o.selected = true;
+      s.appendChild(o);
+    });
+    s.addEventListener('change', function () { onChange(s.value); });
+    return s;
+  }
+
+  function renderSettings() {
+    var top = stBody.scrollTop;
+    stBody.innerHTML = '';
+    stBody.appendChild(el('p', 'st-help', 'Locations run from the bow at the top to the stern at the bottom. Antennas sit two per row inside each location. Rename a location, add or remove antennas, and move them up or down to match the ship.'));
+
+    layout.forEach(function (sec, si) {
+      var card = el('section', 'st-sec');
+
+      var head = el('div', 'st-sec-head');
+      var zi = el('input', 'st-input zone');
+      zi.type = 'text'; zi.maxLength = 10; zi.value = sec.zone; zi.placeholder = 'Tag';
+      zi.setAttribute('aria-label', 'Location tag, for example MID or FWD');
+      zi.addEventListener('input', function () { sec.zone = zi.value; layoutChanged(); });
+      var ai = el('input', 'st-input area');
+      ai.type = 'text'; ai.maxLength = 30; ai.value = sec.area; ai.placeholder = 'Location name';
+      ai.setAttribute('aria-label', 'Location name');
+      ai.addEventListener('input', function () { sec.area = ai.value; layoutChanged(); });
+      head.appendChild(zi);
+      head.appendChild(ai);
+      head.appendChild(mini('↑', 'Move location up', function () { moveSection(si, -1); }, si === 0));
+      head.appendChild(mini('↓', 'Move location down', function () { moveSection(si, 1); }, si === layout.length - 1));
+      var rmSec = mini('×', 'Remove location', null);
+      armable(rmSec, '×', 'Remove?', function () { removeSection(si); });
+      head.appendChild(rmSec);
+      card.appendChild(head);
+
+      sec.items.forEach(function (it, k) {
+        var row = el('div', 'st-row');
+        var ni = el('input', 'st-input name');
+        ni.type = 'text'; ni.maxLength = 24;
+        ni.value = (state[it.id] && state[it.id].label) || it.label;
+        ni.setAttribute('aria-label', 'Antenna name');
+        ni.addEventListener('input', function () {
+          var v = ni.value.trim();
+          if (!v) return;
+          it.label = v;
+          if (state[it.id]) state[it.id].label = v;
+          save(); layoutChanged();
+        });
+        row.appendChild(ni);
+        row.appendChild(typeSelect(it.type, function (v) { it.type = v; layoutChanged(); renderSettings(); }));
+        row.appendChild(mini('↑', 'Move antenna up', function () { moveItem(sec, k, -1); }, k === 0));
+        row.appendChild(mini('↓', 'Move antenna down', function () { moveItem(sec, k, 1); }, k === sec.items.length - 1));
+        var rmIt = mini('×', 'Remove antenna', null);
+        armable(rmIt, '×', 'Remove?', function () { removeAntenna(sec, k); });
+        row.appendChild(rmIt);
+        card.appendChild(row);
+      });
+
+      if (!sec.items.length) card.appendChild(el('p', 'st-note', 'Not shown on the ship until it has at least one antenna.'));
+
+      var add = el('div', 'st-add');
+      var sel = typeSelect('Starlink', function () {});
+      var addBtn = el('button', 'btn add', 'Add antenna');
+      addBtn.type = 'button';
+      addBtn.addEventListener('click', function () { addAntenna(sec, sel.value); });
+      add.appendChild(sel);
+      add.appendChild(addBtn);
+      card.appendChild(add);
+
+      stBody.appendChild(card);
+    });
+
+    var addSec = el('button', 'btn', 'Add location');
+    addSec.type = 'button';
+    addSec.addEventListener('click', function () {
+      layout.push({ zone: 'NEW', area: 'New location', items: [] });
+      layoutChanged(); renderSettings();
+      stBody.scrollTop = stBody.scrollHeight;
+    });
+    stBody.appendChild(addSec);
+    stBody.scrollTop = top;
+  }
+
+  function openSettings() { closeSheet(); renderSettings(); settingsEl.hidden = false; stBody.scrollTop = 0; }
+  function closeSettings() { settingsEl.hidden = true; renderGrid(); }
+  document.getElementById('gearBtn').addEventListener('click', openSettings);
+  document.getElementById('settingsClose').addEventListener('click', closeSettings);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !settingsEl.hidden) closeSettings();
+  });
+
+  // ---- PDF report: builds a printable report, then opens the print dialog (choose "Save as PDF") ----
+  var STATUS_COLORS = { none: '#6b7885', ok: '#17794a', issue: '#a96a0a', down: '#bf3326' };
+  function zoneOf(i) { return DEFAULTS[i]; }
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function buildReport(now) {
+    var r = document.getElementById('report');
+    r.innerHTML = '';
+
+    var head = el('div', 'r-head');
+    head.appendChild(el('h1', '', 'Antenna Check Report'));
+    head.appendChild(el('p', 'r-date', now.toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })));
+    r.appendChild(head);
+
+    var sum = el('div', 'r-summary');
+    STATUSES.forEach(function (s) {
+      var n = DEFAULTS.filter(function (d) { return state[d.id].status === s.id; }).length;
+      var box = el('div', 'r-count');
+      var b = el('b', '', String(n));
+      b.style.color = STATUS_COLORS[s.id];
+      box.appendChild(b);
+      box.appendChild(el('span', '', s.label));
+      sum.appendChild(box);
+    });
+    r.appendChild(sum);
+
+    var plan = el('div', 'r-plan');
+    DEFAULTS.forEach(function (d, i) {
+      if (d.first) {
+        var sec = el('div', 'r-sec');
+        sec.appendChild(el('span', 'r-zone', zoneOf(i).zone));
+        sec.appendChild(el('span', 'r-area', zoneOf(i).area));
+        plan.appendChild(sec);
+      }
+      var c = STATUS_COLORS[state[d.id].status];
+      var t = el('div', 'r-tile' + (d.round ? ' round' : ''));
+      t.style.borderColor = c;
+      t.appendChild(el('b', '', state[d.id].label));
+      var st = el('span', '', statusOf(d.id).label);
+      st.style.color = c;
+      t.appendChild(st);
+      plan.appendChild(t);
+    });
+    r.appendChild(plan);
+
+    var table = el('table', 'r-table');
+    var thead = el('thead');
+    var hr = el('tr');
+    ['Antenna', 'Type', 'Location', 'Status', 'Updated', 'Note', 'Photos'].forEach(function (h) { hr.appendChild(el('th', '', h)); });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = el('tbody');
+    DEFAULTS.forEach(function (d, i) {
+      var s = state[d.id];
+      var tr = el('tr');
+      tr.appendChild(el('td', 'r-strong', s.label));
+      tr.appendChild(el('td', '', d.type));
+      tr.appendChild(el('td', '', zoneOf(i).zone + ' · ' + zoneOf(i).area));
+      var stTd = el('td', 'r-strong', statusOf(d.id).label);
+      stTd.style.color = STATUS_COLORS[s.status];
+      tr.appendChild(stTd);
+      tr.appendChild(el('td', '', s.ts ? fmt(s.ts) : '-'));
+      tr.appendChild(el('td', 'r-note', s.note || '-'));
+      tr.appendChild(el('td', '', String((photos[d.id] || []).length)));
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    r.appendChild(table);
+
+    var any = DEFAULTS.some(function (d) { return (photos[d.id] || []).length; });
+    if (any) {
+      var ph = el('div', 'r-photos');
+      ph.appendChild(el('h2', '', 'Photos'));
+      DEFAULTS.forEach(function (d, i) {
+        var list = photos[d.id] || [];
+        if (!list.length) return;
+        var blk = el('section', 'r-block');
+        blk.appendChild(el('h3', '', state[d.id].label + ' · ' + d.type + ' · ' + zoneOf(i).zone + ' ' + zoneOf(i).area));
+        blk.appendChild(el('p', 'r-meta', statusOf(d.id).label + (state[d.id].note ? ' - ' + state[d.id].note : '')));
+        var g = el('div', 'r-grid');
+        list.forEach(function (src, k) {
+          var f = el('figure');
+          var im = document.createElement('img');
+          im.src = src; im.alt = '';
+          f.appendChild(im);
+          f.appendChild(el('figcaption', '', 'Photo ' + (k + 1) + ' of ' + list.length));
+          g.appendChild(f);
+        });
+        blk.appendChild(g);
+        ph.appendChild(blk);
+      });
+      r.appendChild(ph);
+    }
+  }
+
+  function printReport() {
+    var now = new Date();
+    buildReport(now);
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    var prevTitle = document.title;
+    document.title = 'Antenna Check Report ' + now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + pad(now.getMinutes());
+    var imgs = Array.prototype.slice.call(document.querySelectorAll('#report img'));
+    Promise.all(imgs.map(function (im) {
+      return im.decode ? im.decode().catch(function () {}) : Promise.resolve();
+    })).then(function () {
+      window.onafterprint = function () { document.title = prevTitle; window.onafterprint = null; };
+      window.print();
+    });
+  }
+  document.getElementById('pdf').addEventListener('click', printReport);
+
+  var resetBtn = document.getElementById('reset');
+  var armed = false, armTimer;
+  resetBtn.addEventListener('click', function () {
+    if (!armed) {
+      armed = true; resetBtn.textContent = 'Tap again to clear all';
+      armTimer = setTimeout(function () { armed = false; resetBtn.textContent = 'Reset all'; }, 3000);
+      return;
+    }
+    clearTimeout(armTimer); armed = false; resetBtn.textContent = 'Reset all';
+    state = blank(); save(); clearAllPhotos(); closeSheet(); renderStamp(); showToast('All antennas cleared');
+  });
+
+  function renderStamp() {
+    var latest = 0;
+    DEFAULTS.forEach(function (d) { if (state[d.id].ts && state[d.id].ts > latest) latest = state[d.id].ts; });
+    document.getElementById('stamp').textContent = latest ? 'Last change ' + fmt(latest) : 'No checks recorded yet';
+  }
+
+  loadLayout(); rebuild(); load(); renderGrid(); renderStamp();
+  openDB(function () {
+    if (!db) { document.getElementById('photoHint').hidden = false; }
+    loadPhotos(function () { renderGrid(); if (selected) renderThumbs(); });
+  });
+})();
+</script>
+</body>
+</html>
