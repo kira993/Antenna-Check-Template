@@ -85,6 +85,10 @@ Generate the PDF report on the same device where you recorded the checks.
 - Fonts fall back to your device's built-in fonts when you are offline, so the lettering may look slightly different.
 - The PDF report lists the locations in plan order but does not include the ship outline.
 
+## Free to use
+
+This tool is free to use. You are welcome to copy it, change the code and adapt it to suit your own ships, antennas and procedures. It is provided as is, without any warranty.
+
 ## Files
 
 | File | Purpose |
